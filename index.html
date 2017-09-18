@@ -65,7 +65,12 @@
 
 		<script src="data.js"></script>
 
+		<script src="Detector.js"></script>
+		<script src="dat.gui.min.js"></script>
+
 		<script>
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
 			var container;
 			var camera, scene, renderer;
@@ -148,6 +153,10 @@
 					var li = document.getElementById(key);
 					li.addEventListener('mouseover', function() {
 						if (stickied) return;
+						controls.target.x = data['node'][this.id].x/4;
+						controls.target.z = data['node'][this.id].y/4;
+						controls.update();
+						renderer.render( scene, camera );
 						var visibleLink = [];
 						for (var key in links) {
 							if ( key == this.id ) {
@@ -177,6 +186,10 @@
 					li.addEventListener('mouseout', function() { 
 						if (stickied) return;
 						unfocus()
+						controls.target.x = 0;
+						controls.target.z = 0;
+						controls.update();
+						renderer.render( scene, camera );
 						for (var key in links) {
 							for (var i = 0; i < links[key].length; i++) {
 								links[key][i].visible = true;
@@ -245,7 +258,7 @@
 				}
 				var links = {};
 				var layers = {};
-				layers['L1'] = 0+256+50;
+				layers['L1'] = 0+256+45;
 				layers['L2'] = 512+256;
 				layers['L3'] = 1024+512+256;
 				var Pillar = function(json) {
@@ -282,9 +295,7 @@
 				//
 				controls = new THREE.OrbitControls( camera, renderer.domElement );
 				controls.enablePan = false;
-				controls.minDistance = 1000.0;
-				controls.maxDistance = 5000.0;
-				controls.maxPolarAngle = Math.PI * 0.495;
+				controls.maxDistance = 15000.0;
 				controls.target.set( 0, 1024+128, 0 );
 				controls.update();
 
@@ -300,9 +311,6 @@
 				light2.position.set(  1, - 1,  1 );
 				scene.add( light2 );
 
-				var light3 = new THREE.DirectionalLight( 0xffffff, 10 );
-				light3.position.set(  0, - 1,  0 );
-				scene.add( light3 );
 				//
 
 				waterNormals = new THREE.TextureLoader().load( 'waternormals.jpg' );
@@ -387,6 +395,26 @@
 
 				window.addEventListener( 'resize', onWindowResize, false );
 
+
+				var effectController  = {
+					point_of_view: 1152,
+				};
+
+				function guiChanged() {
+
+					var uniforms = controls.target;
+					uniforms.y = effectController.point_of_view;
+
+					controls.update();
+					renderer.render( scene, camera );
+
+				}
+
+				var gui = new dat.GUI();
+
+				gui.add( effectController, "point_of_view", -1024.0, 2048.0, 0.1 ).onChange( guiChanged );
+
+				guiChanged();
 			}
 
 			function onWindowResize() {
