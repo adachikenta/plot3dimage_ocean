@@ -75,6 +75,7 @@
 			var container;
 			var camera, scene, renderer;
 			var controls, water, sphere;
+			var gSprites;
 
 			var parameters = {
 				width: 2000,
@@ -153,10 +154,6 @@
 					var li = document.getElementById(key);
 					li.addEventListener('mouseover', function() {
 						if (stickied) return;
-						controls.target.x = data['node'][this.id].x/4;
-						controls.target.z = data['node'][this.id].y/4;
-						controls.update();
-						renderer.render( scene, camera );
 						var visibleLink = [];
 						for (var key in links) {
 							if ( key == this.id ) {
@@ -172,6 +169,21 @@
 						for (var i = 0; i < visibleLink.length; i++) {
 							visibleLink[i].visible = true;
 						}
+						var visibleSprite = [];
+						for (var key in sprites) {
+							if ( key == this.id ) {
+								for (var i = 0; i < sprites[key].length; i++) {
+									visibleSprite.push(sprites[key][i]);
+								}
+							} else {
+								for (var i = 0; i < sprites[key].length; i++) {
+									sprites[key][i].visible = false;
+								}
+							}
+						}
+						for (var i = 0; i < visibleSprite.length; i++) {
+							visibleSprite[i].visible = true;
+						}
 					}, false);
 					li.addEventListener('mousedown', function() {
 						if (stickied) {
@@ -186,13 +198,14 @@
 					li.addEventListener('mouseout', function() { 
 						if (stickied) return;
 						unfocus()
-						controls.target.x = 0;
-						controls.target.z = 0;
-						controls.update();
-						renderer.render( scene, camera );
 						for (var key in links) {
 							for (var i = 0; i < links[key].length; i++) {
 								links[key][i].visible = true;
+							}
+						}
+						for (var key in sprites) {
+							for (var i = 0; i < sprites[key].length; i++) {
+								sprites[key][i].visible = true;
 							}
 						}
 					}, false);
@@ -223,6 +236,16 @@
 						scene.add(box);
 					}
 				}
+				var spriteTexture = new THREE.TextureLoader().load( 'particleA.png' );
+				var addSprite = function(x, y, z, h, s, l) {
+					var spriteGeo = new THREE.Geometry();
+					spriteGeo.vertices.push( new THREE.Vector3( x, y, z ) );
+					var materials = new THREE.PointsMaterial( { size: 200, map: spriteTexture, blending: THREE.AdditiveBlending, depthTest: false, transparent : true } );
+					materials.color.setHSL( h, s, l );
+					var particles = new THREE.Points( spriteGeo, materials );
+					scene.add( particles );
+					return particles;
+				}
 				var lineMaterial = new THREE.LineBasicMaterial( { color: 0x000000, opacity: 0.088, linewidth: 1 } );
 				var addLine = function(x1, y1, z1, x2, y2, z2) {
 					var geometry = new THREE.Geometry();
@@ -240,7 +263,7 @@
 				xyMeshMin = -1024; xyMeshMax = 1024; xyMeshSize = xyMeshMax - xyMeshMin;
 				xyMeshSpan = 512; xyMeshNum = xyMeshSize / xyMeshSpan + xyMeshSize % xyMeshSpan;
 				xyMeshMid = xyMeshNum / 2 + xyMeshNum % 2;
-				lineMaterial = new THREE.LineBasicMaterial( { color: 0x000000, opacity: 0.5, linewidth: 1 } );
+				lineMaterial = new THREE.LineBasicMaterial( { color: 0x1F1F1F, opacity: 0.5, linewidth: 1 } );
 				for (var l = 0; l <= lMeshNum; l++) {
 					if (l != lMeshMid && l != 1) continue;
 					for (var x = 0; x <= xyMeshNum; x++) {
@@ -256,6 +279,8 @@
 						}
 					}
 				}
+				gSprites = new Array();
+				var sprites = {};
 				var links = {};
 				var layers = {};
 				layers['L1'] = 0+256+45;
@@ -272,6 +297,18 @@
 							links[json[key].from].push(link);
 							if( null == links[key]) links[key] = new Array();
 							links[key].push(link);
+							var sprite = addSprite(json[json[key].from].x, layers[json[json[key].from].layer], json[json[key].from].y, 0.6, 0.2, 0.5);
+							sprite.xFrom = json[json[key].from].x;
+							sprite.yFrom = layers[json[json[key].from].layer];
+							sprite.zFrom = json[json[key].from].y;
+							sprite.xTo = json[key].x;
+							sprite.yTo = layers[json[key].layer];
+							sprite.zTo = json[key].y;
+							gSprites.push(sprite);
+							if( null == sprites[json[key].from]) sprites[json[key].from] = new Array();
+							sprites[json[key].from].push(sprite);
+							if( null == sprites[key]) sprites[key] = new Array();
+							sprites[key].push(sprite);
 						}
 						if( null != json[key].to ){
 							lineMaterial = new THREE.LineBasicMaterial( { color: 0xFF0000, opacity: 0.5, linewidth: 1 } );
@@ -280,9 +317,21 @@
 							links[json[key].to].push(link);
 							if( null == links[key]) links[key] = new Array();
 							links[key].push(link);
+							var sprite = addSprite(json[key].x, layers[json[key].layer], json[key].y, 1.0, 0.2, 0.5);
+							sprite.xFrom = json[key].x;
+							sprite.yFrom = layers[json[key].layer];
+							sprite.zFrom = json[key].y;
+							sprite.xTo = json[json[key].to].x;
+							sprite.yTo = layers[json[json[key].to].layer];
+							sprite.zTo = json[json[key].to].y;
+							gSprites.push(sprite);
+							if( null == sprites[json[key].to]) sprites[json[key].to] = new Array();
+							sprites[json[key].to].push(sprite);
+							if( null == sprites[key]) sprites[key] = new Array();
+							sprites[key].push(sprite);
 						}
 						if( null != json[key].same ){
-							lineMaterial = new THREE.LineBasicMaterial( { color: 0x000000, opacity: 1.0, linewidth: 2 } );
+							lineMaterial = new THREE.LineBasicMaterial( { color: 0xFFFFFF, opacity: 1.0, linewidth: 2 } );
 							addLine( json[key].x, layers[json[key].layer], json[key].y, json[json[key].same].x, layers[json[json[key].same].layer], json[json[key].same].y);
 						}
 					}
@@ -397,13 +446,13 @@
 
 
 				var effectController  = {
-					point_of_view: 1152,
+					ocean: ! true
 				};
 
 				function guiChanged() {
 
-					var uniforms = controls.target;
-					uniforms.y = effectController.point_of_view;
+					skyBox.visible = effectController.ocean;
+					mirrorMesh.visible = effectController.ocean;
 
 					controls.update();
 					renderer.render( scene, camera );
@@ -411,8 +460,7 @@
 				}
 
 				var gui = new dat.GUI();
-
-				gui.add( effectController, "point_of_view", -1024.0, 2048.0, 0.1 ).onChange( guiChanged );
+				gui.add( effectController, "ocean" ).onChange( guiChanged );
 
 				guiChanged();
 			}
@@ -438,6 +486,12 @@
 			function render() {
 
 				var time = performance.now() * 0.001;
+
+				for (var i = 0; i < gSprites.length; i++) {
+					gSprites[i].position.x = time % 10 * (gSprites[i].xTo - gSprites[i].xFrom) / 10;
+					gSprites[i].position.y = time % 10 * (gSprites[i].yTo - gSprites[i].yFrom) / 10;
+					gSprites[i].position.z = time % 10 * (gSprites[i].zTo - gSprites[i].zFrom) / 10;
+				}
 
 				water.material.uniforms.time.value += 1.0 / 60.0;
 				water.render();
