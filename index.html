@@ -67,15 +67,17 @@
 
 		<script src="Detector.js"></script>
 		<script src="dat.gui.min.js"></script>
+		<script src="stats.min.js"></script>
 
 		<script>
 
 			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
-			var container;
+			var container, stats;
 			var camera, scene, renderer;
 			var controls, water, sphere;
 			var gSprites;
+			var gBall;
 
 			var parameters = {
 				width: 2000,
@@ -103,6 +105,8 @@
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				container.appendChild( renderer.domElement );
 
+				stats = new Stats();
+				container.appendChild( stats.dom );
 				//
 
 				scene = new THREE.Scene();
@@ -110,8 +114,10 @@
 
 				//
 
-				camera = new THREE.PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 0.5, 3000000 );
-				camera.position.set( 3000, 1500, 50 );
+				//camera = new THREE.PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 0.5, 3000000 );
+				//camera.position.set( 3000, 1500, 50 );
+				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 100, 2000000 );
+				camera.position.set( 0, 1500, 3000 );
 
 				//
 
@@ -184,6 +190,21 @@
 						for (var i = 0; i < visibleSprite.length; i++) {
 							visibleSprite[i].visible = true;
 						}
+						var visibleSpriteMask = [];
+						for (var key in spriteMasks) {
+							if ( key == this.id ) {
+								for (var i = 0; i < spriteMasks[key].length; i++) {
+									visibleSpriteMask.push(spriteMasks[key][i]);
+								}
+							} else {
+								for (var i = 0; i < spriteMasks[key].length; i++) {
+									spriteMasks[key][i].visible = false;
+								}
+							}
+						}
+						for (var i = 0; i < visibleSpriteMask.length; i++) {
+							visibleSpriteMask[i].visible = true;
+						}
 					}, false);
 					li.addEventListener('mousedown', function() {
 						if (stickied) {
@@ -208,6 +229,11 @@
 								sprites[key][i].visible = true;
 							}
 						}
+						for (var key in spriteMasks) {
+							for (var i = 0; i < spriteMasks[key].length; i++) {
+								spriteMasks[key][i].visible = true;
+							}
+						}
 					}, false);
 				}
 				var overlay = function() {
@@ -218,24 +244,6 @@
 				overlay();
 
 				//
-				var billboard = function(sprite, x, y, z) {
-					var j = sprite < 10 ? '0'+sprite : sprite+'';
-					var path = "labels/labels_"+j+".jpg";
-					var loader = new THREE.TextureLoader();
-					loader.load(path, function(texture){
-						createBox(texture); // mesh作成
-						render();
-					});
-					function createBox(texture){
-						box = new THREE.Mesh(
-							new THREE.BoxGeometry(100, 100, 100),
-							new THREE.MeshLambertMaterial({map: texture})  // {map: texture}がキモ
-						);
-						box.position.set(x, y, z);
-						// シーンに追加
-						scene.add(box);
-					}
-				}
 				var spriteTexture = new THREE.TextureLoader().load( 'particleA.png' );
 				var addSprite = function(x, y, z, h, s, l) {
 					var spriteGeo = new THREE.Geometry();
@@ -243,6 +251,16 @@
 					var materials = new THREE.PointsMaterial( { size: 200, map: spriteTexture, blending: THREE.AdditiveBlending, depthTest: false, transparent : true } );
 					materials.color.setHSL( h, s, l );
 					var particles = new THREE.Points( spriteGeo, materials );
+					scene.add( particles );
+					return particles;
+				}
+				var spriteMaskTexture = new THREE.TextureLoader().load( 'map_mask.png' );
+				var addSpriteMask = function(x, y, z, h, s, l) {
+					var spriteMaskGeo = new THREE.Geometry();
+					spriteMaskGeo.vertices.push( new THREE.Vector3( x, y, z ) );
+					var materials = new THREE.PointsMaterial( { size: 200, map: spriteMaskTexture, blending: THREE.AdditiveBlending, depthTest: false, transparent : true } );
+					materials.color.setHSL( h, s, l );
+					var particles = new THREE.Points( spriteMaskGeo, materials );
 					scene.add( particles );
 					return particles;
 				}
@@ -279,7 +297,23 @@
 						}
 					}
 				}
+				
+				var addBall = function(sprite, x, y, z) {
+					var j = sprite < 10 ? '0'+sprite : sprite+'';
+					var path = "labels/labels_"+j+".jpg";
+					var ballTexture = new THREE.TextureLoader().load( path );
+					var geometry = new THREE.SphereGeometry(80, 100, 100, -1.5);
+					var material = new THREE.MeshPhongMaterial( { map: ballTexture, color: 0xffffff } );
+					var sphere = new THREE.Mesh( geometry, material );
+					sphere.position.set(x, y, z);
+					scene.add( sphere );
+					return sphere;
+				}
+				gBall = new Array();;
+				
 				gSprites = new Array();
+				gSpriteMasks = new Array();
+				var spriteMasks = {};
 				var sprites = {};
 				var links = {};
 				var layers = {};
@@ -289,9 +323,10 @@
 				var Pillar = function(json) {
 					for (var key in json) {
 						//if (json[key].skip) continue;
-						billboard(json[key].image, json[key].x, layers[json[key].layer], json[key].y);
+						var ball = addBall(json[key].image, json[key].x, layers[json[key].layer], json[key].y);
+						gBall.push(ball);
 						if( null != json[key].from ){
-							lineMaterial = new THREE.LineBasicMaterial( { color: 0x0000FF, opacity: 0.5, linewidth: 1 } );
+							lineMaterial = new THREE.LineBasicMaterial( { color: 0x0f0f80, opacity: 0.5, linewidth: 1 } );
 							var link = addLine( json[key].x, layers[json[key].layer], json[key].y, json[json[key].from].x, layers[json[json[key].from].layer], json[json[key].from].y);
 							if( null == links[json[key].from]) links[json[key].from] = new Array();
 							links[json[key].from].push(link);
@@ -309,9 +344,21 @@
 							sprites[json[key].from].push(sprite);
 							if( null == sprites[key]) sprites[key] = new Array();
 							sprites[key].push(sprite);
+							var spriteMask = addSpriteMask(json[json[key].from].x, layers[json[json[key].from].layer], json[json[key].from].y, 0.6, 0.2, 0.5);
+							spriteMask.xFrom = json[json[key].from].x;
+							spriteMask.yFrom = layers[json[json[key].from].layer];
+							spriteMask.zFrom = json[json[key].from].y;
+							spriteMask.xTo = json[key].x;
+							spriteMask.yTo = layers[json[key].layer];
+							spriteMask.zTo = json[key].y;
+							gSpriteMasks.push(spriteMask);
+							if( null == spriteMasks[json[key].from]) spriteMasks[json[key].from] = new Array();
+							spriteMasks[json[key].from].push(spriteMask);
+							if( null == spriteMasks[key]) spriteMasks[key] = new Array();
+							spriteMasks[key].push(spriteMask);
 						}
 						if( null != json[key].to ){
-							lineMaterial = new THREE.LineBasicMaterial( { color: 0xFF0000, opacity: 0.5, linewidth: 1 } );
+							lineMaterial = new THREE.LineBasicMaterial( { color: 0x800f0f, opacity: 0.5, linewidth: 1 } );
 							var link = addLine( json[key].x, layers[json[key].layer], json[key].y, json[json[key].to].x, layers[json[json[key].to].layer], json[json[key].to].y);
 							if( null == links[json[key].to]) links[json[key].to] = new Array();
 							links[json[key].to].push(link);
@@ -329,6 +376,19 @@
 							sprites[json[key].to].push(sprite);
 							if( null == sprites[key]) sprites[key] = new Array();
 							sprites[key].push(sprite);
+
+							var spriteMask = addSpriteMask(json[key].x, layers[json[key].layer], json[key].y, 1.0, 0.2, 0.5);
+							spriteMask.xFrom = json[key].x;
+							spriteMask.yFrom = layers[json[key].layer];
+							spriteMask.zFrom = json[key].y;
+							spriteMask.xTo = json[json[key].to].x;
+							spriteMask.yTo = layers[json[json[key].to].layer];
+							spriteMask.zTo = json[json[key].to].y;
+							gSpriteMasks.push(spriteMask);
+							if( null == spriteMasks[json[key].to]) spriteMasks[json[key].to] = new Array();
+							spriteMasks[json[key].to].push(spriteMask);
+							if( null == sprites[key]) sprites[key] = new Array();
+							spriteMasks[key].push(spriteMask);
 						}
 						if( null != json[key].same ){
 							lineMaterial = new THREE.LineBasicMaterial( { color: 0xFFFFFF, opacity: 1.0, linewidth: 2 } );
@@ -355,10 +415,6 @@
 				var light = new THREE.DirectionalLight( 0xffffff, 1 );
 				light.position.set( - 1, 1, - 1 );
 				scene.add( light );
-
-				var light2 = new THREE.DirectionalLight( 0xffffff, 1 );
-				light2.position.set(  1, - 1,  1 );
-				scene.add( light2 );
 
 				//
 
@@ -480,17 +536,27 @@
 
 				requestAnimationFrame( animate );
 				render();
+				stats.update();
 
 			}
 
 			function render() {
 
 				var time = performance.now() * 0.001;
+				
+				for (var i = 0; i < gBall.length; i++) {
+					gBall[i].lookAt( camera.position );
+				}
 
 				for (var i = 0; i < gSprites.length; i++) {
 					gSprites[i].position.x = time % 10 * (gSprites[i].xTo - gSprites[i].xFrom) / 10;
 					gSprites[i].position.y = time % 10 * (gSprites[i].yTo - gSprites[i].yFrom) / 10;
 					gSprites[i].position.z = time % 10 * (gSprites[i].zTo - gSprites[i].zFrom) / 10;
+				}
+				for (var i = 0; i < gSpriteMasks.length; i++) {
+					gSpriteMasks[i].position.x = time % 10 * (gSpriteMasks[i].xTo - gSpriteMasks[i].xFrom) / 10;
+					gSpriteMasks[i].position.y = time % 10 * (gSpriteMasks[i].yTo - gSpriteMasks[i].yFrom) / 10;
+					gSpriteMasks[i].position.z = time % 10 * (gSpriteMasks[i].zTo - gSpriteMasks[i].zFrom) / 10;
 				}
 
 				water.material.uniforms.time.value += 1.0 / 60.0;
